@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Andreani — Migración CRM</title>
+
+  <!-- UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #F1F5F9;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    /* ============================
+       IMPORTS (SIN BABEL)
+    ============================ */
+    import React, { useState, useEffect, useRef } from "https://esm.sh/react@18";
+    import ReactDOM from "https://esm.sh/react-dom@18/client";
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    /* ============================
+       FIREBASE CONFIG (TUYO)
+    ============================ */
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "andreani-migracion.firebaseapp.com",
+      projectId: "andreani-migracion",
+      storageBucket: "andreani-migracion.appspot.com",
+      appId: "TU_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const fireDB = getFirestore(app);
+    console.log("🔥 Firebase conectado", fireDB);
+
+    /* ============================
+       USUARIO SIMPLE
+    ============================ */
+    const USER =
+      sessionStorage.getItem("andreani_user") ||
+      prompt("Ingresá tu nombre:");
+    sessionStorage.setItem("andreani_user", USER);
+
+    /* ============================
+       UTILIDADES
+    ============================ */
+    const uid = () =>
+      Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+    /* ============================
+       APP PRINCIPAL
+    ============================ */
+    function App() {
+
+      const [db, setDb] = useState({
+        naves: [],
+        clients: [],
+        meetings: [],
+        lastUpdateBy: "",
+        lastUpdateAt: ""
+      });
+
+      /* 🔄 LEER EN TIEMPO REAL */
+      useEffect(() => {
+        const ref = doc(fireDB, "proyectos", "andreani");
+        const unsub = onSnapshot(ref, snap => {
+          if (snap.exists()) {
+            setDb(snap.data());
+          }
+        });
+        return () => unsub();
+      }, []);
+
+      /* 💾 GUARDAR AUTOMÁTICO */
+      useEffect(() => {
+        const ref = doc(fireDB, "proyectos", "andreani");
+        setDoc(ref, {
+          ...db,
+          lastUpdateBy: USER,
+          lastUpdateAt: new Date().toISOString()
+        });
+      }, [db]);
+
+      /* ========= EJEMPLOS DE ACCIONES ========= */
+      const addNave = () => {
+        setDb(d => ({
+          ...d,
+          naves: [...d.naves, {
+            id: uid(),
+            name: "NUEVA NAVE",
+            createdBy: USER,
+            createdAt: new Date().toISOString()
+          }]
+        }));
+      };
+
+      return (
+        <div className="min-h-screen p-8">
+          <header className="mb-6">
+            <h1 className="text-3xl font-black uppercase italic">
+              Andreani <span className="text-red-600">Migración CRM</span>
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Último cambio: <b>{db.lastUpdateBy}</b>
+              {db.lastUpdateAt && " – " + new Date(db.lastUpdateAt).toLocaleString()}
+            </p>
+          </header>
+
+          <button
+            onClick={addNave}
+            className="mb-6 px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700"
+          >
+            Agregar nave (prueba)
+          </button>
+
+          <pre className="bg-white rounded-xl p-4 text-xs overflow-auto max-h-[500px]">
+            {JSON.stringify(db, null, 2)}
+          </pre>
+        </div>
+      );
+    }
+
+    /* ============================
+       RENDER
+    ============================ */
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+
+</html>
